@@ -4,58 +4,86 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Energy Consumption Details</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Chart.js for bar graph -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS for Excel reading -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background-color: #f8f9fa;
       margin: 0;
-      background-color: #f6f7f9;
+      padding: 0;
+      text-align: center;
+      color: #7b1113;
     }
+
     header {
-      background-color: #8b1414;
+      background-color: #7b1113;
       color: white;
-      padding: 20px 0;
-      text-align: center;
-      font-size: 1.8rem;
+      padding: 20px;
+      font-size: 26px;
       font-weight: bold;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
     }
+
     .container {
-      max-width: 900px;
-      margin: 40px auto;
       background: white;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      margin: 50px auto;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      max-width: 900px;
     }
-    canvas {
+
+    h2 {
+      color: #7b1113;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .chart-container {
+      position: relative;
+      margin: auto;
+      height: 400px;
       width: 100%;
-      max-height: 400px;
     }
-    button {
-      display: block;
-      margin: 25px auto 0;
-      padding: 10px 18px;
-      background-color: #8b1414;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 1rem;
-    }
-    button:hover {
-      background-color: #a61c1c;
-    }
-    #totalEnergy {
-      font-weight: 600;
-      font-size: 1.1rem;
-      margin-bottom: 15px;
-      text-align: center;
-    }
-    #errorMsg {
-      color: red;
-      text-align: center;
+
+    .info {
+      margin-top: 30px;
+      font-size: 18px;
+      color: #222;
       font-weight: 500;
+    }
+
+    .carbon {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1e7d22;
+      margin-top: 10px;
+    }
+
+    .back-btn {
+      display: inline-block;
+      background-color: #7b1113;
+      color: white;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: background 0.3s ease;
+      margin-top: 30px;
+    }
+
+    .back-btn:hover {
+      background-color: #a41b1e;
+    }
+
+    .error {
+      color: red;
+      margin-top: 20px;
     }
   </style>
 </head>
@@ -63,105 +91,111 @@
   <header>Energy Consumption Details</header>
 
   <div class="container">
-    <div id="totalEnergy"></div>
-    <canvas id="barChart"></canvas>
-    <p id="errorMsg"></p>
-    <button onclick="window.location.href='index.html'">← Back</button>
+    <h2 id="buildingTitle"></h2>
+    <div class="chart-container">
+      <canvas id="energyChart"></canvas>
+    </div>
+
+    <div class="info">
+      <p id="totalEnergy"></p>
+      <p class="carbon" id="carbonEmission"></p>
+    </div>
+
+    <div class="error" id="errorMsg"></div>
+
+    <a href="index.html" class="back-btn">← Back</a>
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", loadBuildingData);
-
-    function loadBuildingData() {
+    // Helper to get query parameters
+    function getQueryParam(name) {
       const params = new URLSearchParams(window.location.search);
-      const building = params.get("building");
-      const type = params.get("type");
+      return params.get(name);
+    }
 
-      if (!building || !type) {
-        document.getElementById("errorMsg").textContent = "Invalid building selection.";
-        return;
-      }
+    const building = getQueryParam("building") || localStorage.getItem("selectedBuilding");
+    const type = getQueryParam("type") || localStorage.getItem("selectedType");
 
-      fetch("energy.xlsx")
-        .then(res => res.arrayBuffer())
-        .then(data => {
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = type === "academic" ? workbook.SheetNames[0] : workbook.SheetNames[1];
-          const sheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(sheet);
+    document.getElementById("buildingTitle").innerText =
+      building ? `${building} (${type})` : "Building Details";
 
-          const buildingData = json.find(
-            row => String(row["Building Name"]).trim().toLowerCase() === building.toLowerCase()
-          );
+    if (!building || !type) {
+      document.getElementById("errorMsg").innerText = "Invalid building selection.";
+    } else {
+      loadEnergyData(building, type);
+    }
 
-          if (!buildingData) {
-            document.getElementById("errorMsg").textContent =
-              "Building data not found in the Excel file.";
-            return;
+    async function loadEnergyData(building, type) {
+      try {
+        const response = await fetch("energy.xlsx");
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+
+        // Selecting sheet based on type
+        const sheetName = workbook.SheetNames.find(s => s.toLowerCase().includes(type));
+        if (!sheetName) {
+          document.getElementById("errorMsg").innerText = "No matching sheet found.";
+          return;
+        }
+
+        const sheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Identify column headers and building row
+        const headers = data[2].slice(2); // Jan–Dec, Total
+        const rows = data.slice(3);
+
+        const targetRow = rows.find(row => row[1] && row[1].toString().trim().toLowerCase() === building.toLowerCase());
+        if (!targetRow) {
+          document.getElementById("errorMsg").innerText = "Building not found in data.";
+          return;
+        }
+
+        const months = headers.slice(0, 10); // Jan–Oct
+        const monthlyValues = targetRow.slice(2, 12).map(v => Number(v) || 0);
+        const total = targetRow[targetRow.length - 1];
+
+        // Calculate carbon emission (assume 0.82 kg CO2 per kWh)
+        const carbon = total * 0.82 / 1000; // in tonnes
+
+        // Update text
+        document.getElementById("totalEnergy").innerText = `Total Energy Consumption: ${total.toLocaleString()} kWh`;
+        document.getElementById("carbonEmission").innerText = `Estimated Carbon Emission: ${carbon.toFixed(2)} tonnes CO₂`;
+
+        // Draw bar chart
+        const ctx = document.getElementById("energyChart").getContext("2d");
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: months,
+            datasets: [{
+              label: "Monthly Energy (kWh)",
+              data: monthlyValues,
+              backgroundColor: "#7b1113aa",
+              borderColor: "#7b1113",
+              borderWidth: 1,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { beginAtZero: true }
+            },
+            plugins: {
+              legend: { display: false },
+              title: {
+                display: true,
+                text: "Monthly Energy Consumption",
+                font: { size: 18 }
+              }
+            }
           }
-
-          // Extract month-wise data
-          const months = Object.keys(buildingData).filter(
-            key => !["Building Name", "Type"].includes(key)
-          );
-          const values = months.map(m => Number(buildingData[m]) || 0);
-
-          // Calculate total
-          const total = values.reduce((a, b) => a + b, 0);
-          document.getElementById("totalEnergy").textContent =
-            `Total Annual Energy Consumption: ${total.toFixed(2)} kWh`;
-
-          // Bar Chart
-          const ctx = document.getElementById("barChart").getContext("2d");
-          new Chart(ctx, {
-            type: "bar",
-            data: {
-              labels: months,
-              datasets: [
-                {
-                  label: "Monthly Energy (kWh)",
-                  data: values,
-                  backgroundColor: "#8b1414a0",
-                  borderColor: "#8b1414",
-                  borderWidth: 1,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  title: {
-                    display: true,
-                    text: "Energy (kWh)",
-                  },
-                },
-                x: {
-                  title: {
-                    display: true,
-                    text: "Month",
-                  },
-                },
-              },
-              plugins: {
-                legend: { display: false },
-                title: {
-                  display: true,
-                  text: "Monthly Energy Consumption Chart",
-                  font: { size: 18 },
-                },
-              },
-            },
-          });
-        })
-        .catch(err => {
-          console.error(err);
-          document.getElementById("errorMsg").textContent =
-            "Error loading Excel file. Ensure 'energy.xlsx' is in the same folder.";
         });
+      } catch (error) {
+        console.error(error);
+        document.getElementById("errorMsg").innerText = "Error loading data.";
+      }
     }
   </script>
 </body>
 </html>
-
