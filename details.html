@@ -1,194 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Energy Consumption Details</title>
-
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <style>
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      background-color: #fafafa;
-      margin: 0;
-      padding: 0;
-      text-align: center;
-    }
-
-    header {
-      background-color: #7b1113;
-      color: white;
-      padding: 16px;
-      font-size: 22px;
-      font-weight: 700;
-    }
-
-    .container {
-      margin: 40px auto;
-      max-width: 700px;
-      background: white;
-      padding: 30px;
-      border-radius: 12px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-      color: #7b1113;
-      margin-bottom: 10px;
-    }
-
-    .result {
-      margin-top: 20px;
-      font-size: 18px;
-      font-weight: bold;
-      color: #333;
-    }
-
-    canvas {
-      margin-top: 25px;
-      width: 100%;
-      max-height: 300px;
-    }
-
-    button {
-      margin-top: 20px;
-      background-color: #7b1113;
-      color: white;
-      padding: 10px 18px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-
-    button:hover {
-      background-color: #a41b1e;
-    }
-  </style>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 
-<body>
-  <header>Energy Consumption Details</header>
+<body class="bg-gray-50 flex flex-col items-center justify-center min-h-screen">
+  <div class="w-full bg-red-900 text-white py-4 text-center text-3xl font-bold shadow-lg">
+    Energy Consumption Details
+  </div>
 
-  <div class="container">
-    <h2 id="buildingTitle">Loading...</h2>
-    <div id="output" class="result"></div>
+  <div class="bg-white rounded-2xl shadow-2xl p-8 m-8 w-4/5 md:w-2/3 lg:w-1/2 text-center">
+    <h2 id="buildingName" class="text-2xl font-semibold text-red-800 mb-4"></h2>
+    <p id="totalEnergy" class="text-lg font-medium mb-2 text-gray-700"></p>
+    <p id="carbonEmission" class="text-lg font-medium mb-6 text-gray-700"></p>
 
-    <canvas id="energyPieChart"></canvas>
-    <canvas id="monthlyBarChart"></canvas>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <canvas id="barChart" class="p-4"></canvas>
+      <canvas id="pieChart" class="p-4"></canvas>
+    </div>
 
-    <button onclick="goBack()">← Back</button>
+    <button onclick="history.back()" class="mt-8 bg-red-900 text-white px-6 py-2 rounded-full hover:bg-red-700 transition">
+      ← Back
+    </button>
   </div>
 
   <script>
-    async function loadExcelData() {
-      const building = localStorage.getItem("selectedBuilding");
-      const type = localStorage.getItem("selectedType");
+    // Function to get building name from query string
+    function getParameterByName(name) {
+      const url = window.location.href;
+      name = name.replace(/[\[\]]/g, "\\$&");
+      const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+      const results = regex.exec(url);
+      if (!results) return null;
+      if (!results[2]) return '';
+      return decodeURIComponent(results[2].replace(/\+/g, " "));
+    }
 
-      if (!building || !type) {
-        document.getElementById("output").innerText = "⚠ Invalid building or type selection.";
-        return;
-      }
+    const buildingName = getParameterByName("building");
+    document.getElementById("buildingName").textContent = buildingName + " (academic)";
 
-      document.getElementById("buildingTitle").innerText = `${building} (${type})`;
+    // Load Excel file
+    fetch("energy.xlsx")
+      .then(res => res.arrayBuffer())
+      .then(data => {
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: 0 });
 
-      try {
-        const response = await fetch("energy.xlsx");
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]; // first sheet
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        // Find building
+        const building = json.find(row => row["Building Name"]?.trim().toLowerCase() === buildingName.trim().toLowerCase());
 
-        // find header row (where 'Building Name' exists)
-        const headerRow = jsonData.findIndex(row => row.includes("Building Name"));
-        const headers = jsonData[headerRow];
-        const dataRows = jsonData.slice(headerRow + 1);
+        if (building) {
+          const months = ["Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25","Jul-25","Aug-25","Sep-25"];
+          const values = months.map(m => parseFloat(building[m]) || 0);
+          const totalEnergy = parseFloat(building["Total"]) || 0;
+          const totalCarbon = 0; // Placeholder (to be updated later)
 
-        const monthCols = ["Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25","Jul-25","Aug-25","Sep-25"];
+          document.getElementById("totalEnergy").textContent = `Total Energy (Jan–Sep 2025): ${totalEnergy.toLocaleString()} kWh`;
+          document.getElementById("carbonEmission").textContent = `Total Carbon Emissions: ${totalCarbon} kg CO₂e`;
 
-        // find index of building name column
-        const nameColIndex = headers.indexOf("Building Name");
+          // Chart colors
+          const colors = ["#7f1d1d", "#991b1b", "#b91c1c", "#f59e0b", "#fbbf24", "#fef3c7", "#2563eb", "#0284c7", "#0ea5e9"];
 
-        // find the target row
-        const row = dataRows.find(r => r[nameColIndex]?.toString().trim().toLowerCase() === building.toLowerCase());
-        if (!row) {
-          document.getElementById("output").innerText = "No data found for this building.";
-          return;
-        }
-
-        // extract monthly data
-        const monthlyValues = monthCols.map(m => {
-          const idx = headers.indexOf(m);
-          return idx >= 0 ? Number(row[idx] || 0) : 0;
-        });
-
-        const totalEnergy = monthlyValues.reduce((a, b) => a + b, 0);
-        document.getElementById("output").innerText = `Total Energy (Jan–Sep 2025): ${totalEnergy.toLocaleString()} kWh`;
-
-        // Pie chart
-        const ctx1 = document.getElementById("energyPieChart").getContext("2d");
-        new Chart(ctx1, {
-          type: "pie",
-          data: {
-            labels: monthCols,
-            datasets: [{
-              data: monthlyValues,
-              backgroundColor: [
-                "#7b1113", "#a41b1e", "#d62828", "#f77f00",
-                "#fcbf49", "#eae2b7", "#0077b6", "#0096c7", "#00b4d8"
-              ]
-            }]
-          },
-          options: {
-            plugins: {
-              title: {
-                display: true,
-                text: "Monthly Energy Distribution (kWh)"
-              }
-            }
-          }
-        });
-
-        // Bar chart
-        const ctx2 = document.getElementById("monthlyBarChart").getContext("2d");
-        new Chart(ctx2, {
-          type: "bar",
-          data: {
-            labels: monthCols,
-            datasets: [{
-              label: "Energy (kWh)",
-              data: monthlyValues,
-              backgroundColor: "#7b1113"
-            }]
-          },
-          options: {
-            plugins: {
-              title: {
-                display: true,
-                text: "Monthly Energy Consumption"
-              }
+          // Bar Chart
+          new Chart(document.getElementById("barChart"), {
+            type: "bar",
+            data: {
+              labels: months,
+              datasets: [{
+                label: "Energy (kWh)",
+                data: values,
+                backgroundColor: colors,
+              }]
             },
-            scales: {
-              y: {
-                beginAtZero: true
-              }
+            options: {
+              plugins: {
+                title: { display: true, text: "Monthly Energy Consumption" },
+                legend: { display: false }
+              },
+              scales: { y: { beginAtZero: true } }
             }
-          }
-        });
+          });
 
-      } catch (error) {
-        console.error(error);
-        document.getElementById("output").innerText = "⚠ Error reading data.";
-      }
-    }
+          // Pie Chart
+          new Chart(document.getElementById("pieChart"), {
+            type: "pie",
+            data: {
+              labels: months,
+              datasets: [{
+                data: values,
+                backgroundColor: colors,
+              }]
+            },
+            options: {
+              plugins: { title: { display: true, text: "Monthly Energy Distribution (kWh)" } }
+            }
+          });
 
-    function goBack() {
-      window.location.href = "index.html";
-    }
-
-    loadExcelData();
+        } else {
+          document.querySelector(".grid").innerHTML = "<p class='text-red-700 text-lg font-medium'>No data found for this building.</p>";
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        document.querySelector(".grid").innerHTML = "<p class='text-red-700 text-lg font-medium'>Error loading data.</p>";
+      });
   </script>
 </body>
 </html>
