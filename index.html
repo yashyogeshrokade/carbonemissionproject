@@ -114,6 +114,9 @@
 
   <footer>© 2025 Indian Institute of Technology Madras</footer>
 
+  <!-- Include SheetJS (XLSX) for Excel reading -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
   <script>
     const academicBuildings = [
       "SAIF", "MSRC", "Chemistry Block", "CRYO", "BSB", "Structural",
@@ -150,12 +153,12 @@
         return;
       }
 
-      // store selection in localStorage
+      // ✅ Store selection and redirect with URL parameters
       localStorage.setItem("selectedType", type);
       localStorage.setItem("selectedBuilding", building);
 
-      // go to details page
-      window.location.href = "details.html";
+      const url = `details.html?building=${encodeURIComponent(building)}&type=${encodeURIComponent(type)}`;
+      window.location.href = url;
     }
   </script>
 </body>
