@@ -16,14 +16,14 @@
     <!-- Carbon Emission Card -->
     <div class="bg-white p-10 rounded-2xl shadow-lg text-center">
       <h2 id="carbonTitle" class="text-2xl font-semibold text-green-800 mb-6"></h2>
-      <canvas id="carbonChart" width="400" height="400"></canvas>
+      <canvas id="carbonChart" height="350"></canvas>
       <p id="carbonInfo" class="text-lg text-gray-700 mt-4"></p>
     </div>
 
     <!-- Energy Consumption Card -->
     <div class="bg-white p-10 rounded-2xl shadow-lg text-center">
       <h2 id="energyTitle" class="text-2xl font-semibold text-red-800 mb-6"></h2>
-      <canvas id="energyChart" width="400" height="400"></canvas>
+      <canvas id="energyChart" height="350"></canvas>
       <p id="energyInfo" class="text-lg text-gray-700 mt-4"></p>
     </div>
   </div>
@@ -44,14 +44,14 @@
     const months = ["Jan", "Feb", "March", "April", "May", "June", "July", "Aug", "Sep"];
 
     if (buildingName) {
-      document.getElementById("energyTitle").innerText = buildingName;
-      document.getElementById("carbonTitle").innerText = buildingName;
+      document.getElementById("energyTitle").innerText = `${buildingName} - Energy Consumption`;
+      document.getElementById("carbonTitle").innerText = `${buildingName} - Carbon Emission`;
     }
 
     // Utility normalize function
     const normalize = str => str.toLowerCase().replace(/[\s\-\(\)]/g, '');
 
-    // ENERGY CONSUMPTION
+    // ENERGY CONSUMPTION BAR GRAPH
     fetch('energy.xlsx')
       .then(response => response.arrayBuffer())
       .then(data => {
@@ -66,39 +66,47 @@
 
         const energyValues = buildingRow.slice(2, 11).map(Number);
         const totalEnergy = energyValues.reduce((a, b) => a + (b || 0), 0);
+        const maxEnergy = Math.max(...energyValues);
+        const yMax = Math.ceil(maxEnergy * 1.2); // make bars distinct
 
         const ctxEnergy = document.getElementById('energyChart').getContext('2d');
         new Chart(ctxEnergy, {
-          type: 'pie',
+          type: 'bar',
           data: {
             labels: months,
             datasets: [{
+              label: 'Energy Consumption (kWh)',
               data: energyValues,
-              backgroundColor: [
-                '#7f1d1d','#991b1b','#b91c1c','#dc2626','#ef4444',
-                '#f87171','#fecaca','#fee2e2','#450a0a'
-              ],
-              borderColor: '#fff',
-              borderWidth: 1
+              backgroundColor: '#ef4444',
+              borderColor: '#991b1b',
+              borderWidth: 1,
+              borderRadius: 6
             }]
           },
           options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: yMax,
+                ticks: { stepSize: Math.ceil(yMax / 5) }
+              }
+            },
             plugins: {
+              legend: { display: false },
               title: {
                 display: true,
-                text: `Monthly Energy Consumption (kWh)`
-              },
-              legend: { position: 'bottom' }
+                text: 'Monthly Energy Consumption (kWh)',
+                font: { size: 16 }
+              }
             }
           }
         });
 
-        document.getElementById('energyInfo').innerHTML = `
-          <strong>Total Energy:</strong> ${totalEnergy.toLocaleString()} kWh
-        `;
+        document.getElementById('energyInfo').innerHTML =
+          `<strong>Total Energy:</strong> ${totalEnergy.toLocaleString()} kWh`;
       });
 
-    // CARBON EMISSION
+    // CARBON EMISSION BAR GRAPH
     fetch('carbon_emission.xlsx')
       .then(response => response.arrayBuffer())
       .then(data => {
@@ -113,36 +121,44 @@
 
         const carbonValues = buildingRow.slice(2, 11).map(Number);
         const totalCarbon = carbonValues.reduce((a, b) => a + (b || 0), 0);
+        const maxCarbon = Math.max(...carbonValues);
+        const yMax = Math.ceil(maxCarbon * 1.2);
 
         const ctxCarbon = document.getElementById('carbonChart').getContext('2d');
         new Chart(ctxCarbon, {
-          type: 'pie',
+          type: 'bar',
           data: {
             labels: months,
             datasets: [{
+              label: 'Carbon Emission (kg CO₂)',
               data: carbonValues,
-              backgroundColor: [
-                '#065f46','#047857','#059669','#10b981','#34d399',
-                '#6ee7b7','#a7f3d0','#d1fae5','#064e3b'
-              ],
-              borderColor: '#fff',
-              borderWidth: 1
+              backgroundColor: '#10b981',
+              borderColor: '#065f46',
+              borderWidth: 1,
+              borderRadius: 6
             }]
           },
           options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: yMax,
+                ticks: { stepSize: Math.ceil(yMax / 5) }
+              }
+            },
             plugins: {
+              legend: { display: false },
               title: {
                 display: true,
-                text: `Monthly Carbon Emission (kg CO₂)`
-              },
-              legend: { position: 'bottom' }
+                text: 'Monthly Carbon Emission (kg CO₂)',
+                font: { size: 16 }
+              }
             }
           }
         });
 
-        document.getElementById('carbonInfo').innerHTML = `
-          <strong>Total Carbon Emission:</strong> ${totalCarbon.toLocaleString()} kg CO₂
-        `;
+        document.getElementById('carbonInfo').innerHTML =
+          `<strong>Total Carbon Emission:</strong> ${totalCarbon.toLocaleString()} kg CO₂`;
       });
   </script>
 </body>
