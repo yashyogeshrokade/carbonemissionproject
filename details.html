@@ -42,7 +42,18 @@
           const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
           // Extract headers (months)
-          const headers = jsonData[1].slice(2, 14); // Jan–Dec columns
+          let headers = jsonData[1].slice(2, 14);
+
+          // Convert Excel date serials to month-year strings
+          headers = headers.map(val => {
+            if (typeof val === "number") {
+              const date = XLSX.SSF.parse_date_code(val);
+              const jsDate = new Date(date.y, date.m - 1, date.d);
+              return jsDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+            }
+            return val;
+          });
+
           const rows = jsonData.slice(2); // Skip header rows
 
           // Normalize function
@@ -59,7 +70,7 @@
 
           const monthlyValues = buildingRow.slice(2, 14).map(Number);
           const totalEnergy = monthlyValues.reduce((a, b) => a + (b || 0), 0);
-          const carbonEmission = 0; // Set carbon emission to zero for now
+          const carbonEmission = 0; // Fixed to zero
 
           document.getElementById('carbonInfo').innerHTML = `
             <strong>Total Energy:</strong> ${totalEnergy.toLocaleString()} kWh<br>
