@@ -1,123 +1,205 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Building Energy Details</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Energy Details</title>
 
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
-      background: url('https://iisc.ac.in/wp-content/uploads/2022/06/IISc-Campus-2-scaled.jpg') no-repeat center center fixed;
-      background-size: cover;
-      color: #004d40;
-      text-align: center;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background-color: #fafafa;
       margin: 0;
-      padding: 40px;
+      padding: 0;
+      text-align: center;
+      color: #222;
     }
-    h1, h2 {
-      background-color: rgba(255, 255, 255, 0.7);
-      display: inline-block;
-      padding: 10px 20px;
-      border-radius: 12px;
-    }
-    #chartContainer {
-      width: 70%;
-      margin: 30px auto;
-      background-color: rgba(255, 255, 255, 0.8);
-      padding: 20px;
-      border-radius: 15px;
-    }
-    a {
-      display: inline-block;
-      margin-top: 20px;
-      text-decoration: none;
-      background-color: #00796b;
+
+    h1 {
+      background-color: #7b1113;
       color: white;
+      margin: 0;
+      padding: 15px 0;
+      font-size: 26px;
+    }
+
+    .content {
+      padding: 30px;
+      max-width: 900px;
+      margin: auto;
+    }
+
+    #buildingName {
+      font-size: 22px;
+      margin-bottom: 20px;
+      color: #7b1113;
+      font-weight: 600;
+    }
+
+    canvas {
+      margin: 25px auto;
+      display: block;
+      max-width: 700px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .summary {
+      margin-top: 25px;
+      font-size: 18px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    button {
+      margin-top: 30px;
       padding: 10px 20px;
+      border: none;
+      background-color: #7b1113;
+      color: white;
+      font-size: 16px;
       border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
       transition: 0.3s;
     }
-    a:hover {
-      background-color: #004d40;
+
+    button:hover {
+      background-color: #a41b1e;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 14px;
+      color: #555;
     }
   </style>
 </head>
-<body>
-  <h1 id="buildingTitle">Loading...</h1>
-  <h2 id="totalEnergy"></h2>
 
-  <div id="chartContainer">
+<body>
+  <h1>Energy Consumption Details</h1>
+  <div class="content">
+    <div id="buildingName"></div>
+    <div class="summary" id="summary">Loading data...</div>
+
     <canvas id="energyChart"></canvas>
+    <canvas id="pieChart"></canvas>
+
+    <button onclick="goBack()">⬅ Back</button>
   </div>
 
-  <a href="index.html">← Back to main page</a>
+  <footer>© 2025 Indian Institute of Technology Madras</footer>
 
   <script>
-    async function loadExcelData(building) {
-      const response = await fetch('energy.xlsx');
-      const data = await response.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: 0 });
+    const buildingNameDiv = document.getElementById("buildingName");
+    const summaryDiv = document.getElementById("summary");
 
-      const row = json.find(r => r['Building Name'] && r['Building Name'].trim() === building);
-      if (!row) return null;
+    const selectedType = localStorage.getItem("selectedType");
+    const selectedBuilding = localStorage.getItem("selectedBuilding");
 
-      const months = Object.keys(row).filter(k => k.includes('-25'));
-      const values = months.map(m => row[m]);
-      return { months, values, total: row['Total'] };
+    if (!selectedType || !selectedBuilding) {
+      summaryDiv.innerHTML = "⚠ Missing data. Please go back and select again.";
+    } else {
+      buildingNameDiv.textContent = `${selectedBuilding} (${selectedType})`;
+      loadExcelData();
     }
 
-    async function renderChart() {
-      const params = new URLSearchParams(window.location.search);
-      const building = params.get('building');
-      const type = params.get('type');
+    function goBack() {
+      window.location.href = "index.html";
+    }
 
-      if (!building || !type) {
-        document.body.innerHTML = "<h2>⚠ Invalid building or type selection.</h2>";
-        return;
+    async function loadExcelData() {
+      try {
+        const response = await fetch("energy.xlsx"); // ✅ your Excel file name
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        // Filter data for selected building
+        const buildingData = data.filter(row => row.Building === selectedBuilding);
+
+        if (buildingData.length === 0) {
+          summaryDiv.innerHTML = "No data found for this building.";
+          return;
+        }
+
+        const labels = buildingData.map(row => row.Month);
+        const values = buildingData.map(row => row.Energy);
+
+        const totalEnergy = values.reduce((a, b) => a + b, 0).toFixed(2);
+        summaryDiv.innerHTML = `Total Energy Consumption: <b>${totalEnergy} kWh</b>`;
+
+        createLineChart(labels, values);
+        createPieChart(labels, values);
+
+      } catch (error) {
+        console.error(error);
+        summaryDiv.innerHTML = "⚠ Error loading Excel data. Make sure 'energy.xlsx' is in the same folder.";
       }
+    }
 
-      document.getElementById("buildingTitle").textContent = `${building} (${type})`;
-
-      const data = await loadExcelData(building);
-      if (!data) {
-        document.body.innerHTML = "<h2>⚠ No data found for this building.</h2>";
-        return;
-      }
-
-      document.getElementById("totalEnergy").textContent = `Total Energy Consumption: ${data.total.toLocaleString()} kWh`;
-
-      new Chart(document.getElementById('energyChart'), {
-        type: 'pie',
+    function createLineChart(labels, values) {
+      const ctx = document.getElementById("energyChart").getContext("2d");
+      new Chart(ctx, {
+        type: "line",
         data: {
-          labels: data.months,
+          labels: labels,
           datasets: [{
-            data: data.values,
-            backgroundColor: [
-              '#00796b', '#26a69a', '#80cbc4', '#004d40', '#009688',
-              '#4db6ac', '#b2dfdb', '#00695c', '#00897b'
-            ]
+            label: "Monthly Energy Consumption (kWh)",
+            data: values,
+            borderColor: "#7b1113",
+            backgroundColor: "rgba(123,17,19,0.1)",
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3
           }]
         },
         options: {
-          plugins: {
-            title: {
-              display: true,
-              text: 'Monthly Energy Consumption',
-              font: { size: 18 }
-            },
-            legend: { position: 'bottom' }
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
           }
         }
       });
     }
 
-    renderChart();
+    function createPieChart(labels, values) {
+      const ctx = document.getElementById("pieChart").getContext("2d");
+      new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: [
+              "#7b1113", "#a41b1e", "#d25c5f", "#f7a7a9",
+              "#ffcccb", "#c96b6d", "#9b1f22", "#d46b6c"
+            ]
+          }]
+        },
+        options: {
+          plugins: {
+            legend: {
+              position: "bottom"
+            },
+            title: {
+              display: true,
+              text: "Monthly Energy Share (%)"
+            }
+          }
+        }
+      });
+    }
   </script>
 </body>
 </html>
