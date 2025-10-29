@@ -1,137 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Building Details - IITM Energy Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building Energy Details</title>
 
-  <!-- Excel + Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      background-image: url("photo_NAC.png");
-      background-repeat: no-repeat;
+      font-family: 'Poppins', sans-serif;
+      background: url('https://iisc.ac.in/wp-content/uploads/2022/06/IISc-Campus-2-scaled.jpg') no-repeat center center fixed;
       background-size: cover;
-      background-position: center;
-      background-attachment: fixed;
-      margin: 0;
-      padding: 0;
+      color: #004d40;
       text-align: center;
-      color: #222;
-      filter: brightness(1.15) contrast(1.1) saturate(1.15);
-    }
-
-    .detail-page {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 16px;
+      margin: 0;
       padding: 40px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      min-width: 360px;
-      max-width: 420px;
-      margin: 100px auto;
-      backdrop-filter: blur(6px);
-      animation: fadeIn 0.6s ease;
     }
-
-    h1 {
-      color: #7b1113;
-      font-weight: 700;
-      font-size: 28px;
-      margin-bottom: 25px;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    h1, h2 {
+      background-color: rgba(255, 255, 255, 0.7);
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 12px;
     }
-
-    .detail-item {
-      margin: 15px 0;
-      text-align: left;
-      font-size: 17px;
+    #chartContainer {
+      width: 70%;
+      margin: 30px auto;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 20px;
+      border-radius: 15px;
     }
-
-    .detail-item span {
-      color: #7b1113;
-      font-weight: bold;
-    }
-
-    .back-btn {
-      margin-top: 25px;
-      background-color: #7b1113;
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      text-decoration: none;
+      background-color: #00796b;
       color: white;
-      border: none;
       padding: 10px 20px;
       border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
       transition: 0.3s;
     }
-
-    .back-btn:hover {
-      background-color: #a41b1e;
-    }
-
-    footer {
-      position: fixed;
-      bottom: 10px;
-      width: 100%;
-      font-size: 14px;
-      color: #333;
-      text-shadow: 1px 1px 2px rgba(255,255,255,0.6);
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    a:hover {
+      background-color: #004d40;
     }
   </style>
 </head>
-
 <body>
-  <div class="detail-page">
-    <h1 id="buildingTitle">Building Details</h1>
+  <h1 id="buildingTitle">Loading...</h1>
+  <h2 id="totalEnergy"></h2>
 
-    <div class="detail-item"><span>Type:</span> <span id="buildingType"></span></div>
-    <div class="detail-item"><span>Energy Consumption:</span> <span id="energyValue"></span> kWh</div>
-    <div class="detail-item"><span>Carbon Emission:</span> <span id="carbonValue"></span> tCO₂e</div>
-
-    <!-- Pie Chart -->
-    <canvas id="energyChart" width="350" height="350" style="margin-top: 25px;"></canvas>
-
-    <button class="back-btn" onclick="goBack()">← Back</button>
+  <div id="chartContainer">
+    <canvas id="energyChart"></canvas>
   </div>
 
-  <footer>© 2025 Indian Institute of Technology Madras</footer>
+  <a href="index.html">← Back to main page</a>
 
   <script>
-    // --- PIE CHART FUNCTION ---
-    function renderPieChart(labels, values) {
-      const ctx = document.getElementById('energyChart').getContext('2d');
-      new Chart(ctx, {
-        type: 'pie',
-        data: {
-          labels: labels,
-          datasets: [{
-            data: values,
-            backgroundColor: [
-              '#7b1113', '#a41b1e', '#d48c8d', '#f2c1c1',
-              '#f7e2e2', '#c94f4f', '#8b0d0d', '#b52d2d', '#e7a1a1'
-            ],
-            borderWidth: 1
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: 'bottom' },
-            title: { display: true, text: 'Monthly Energy Consumption (kWh)' }
-          }
-        }
-      });
+    async function loadExcelData(building) {
+      const response = await fetch('energy.xlsx');
+      const data = await response.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: 0 });
+
+      const row = json.find(r => r['Building Name'] && r['Building Name'].trim() === building);
+      if (!row) return null;
+
+      const months = Object.keys(row).filter(k => k.includes('-25'));
+      const values = months.map(m => row[m]);
+      return { months, values, total: row['Total'] };
     }
 
-    // --- LOAD BUILDING DETAILS ---
-    async function loadDetails() {
+    async function renderChart() {
       const params = new URLSearchParams(window.location.search);
       const building = params.get('building');
       const type = params.get('type');
@@ -141,59 +82,42 @@
         return;
       }
 
-      document.getElementById("buildingTitle").textContent = building;
-      document.getElementById("buildingType").textContent = type.toUpperCase();
+      document.getElementById("buildingTitle").textContent = `${building} (${type})`;
 
-      try {
-        const response = await fetch('energy.xlsx');
-        if (!response.ok) throw new Error('Excel file not found.');
+      const data = await loadExcelData(building);
+      if (!data) {
+        document.body.innerHTML = "<h2>⚠ No data found for this building.</h2>";
+        return;
+      }
 
-        const data = await response.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = type === "academic" ? "Sheet1" : "Sheet2";
-        const sheet = workbook.Sheets[sheetName];
-        if (!sheet) throw new Error(`${sheetName} not found.`);
+      document.getElementById("totalEnergy").textContent = `Total Energy Consumption: ${data.total.toLocaleString()} kWh`;
 
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-        let totalValue = "N/A";
-        let monthValues = [];
-        let found = false;
-
-        for (let i = 0; i < jsonData.length; i++) {
-          const row = jsonData[i];
-          if (!row || row.length < 15) continue;
-
-          const buildingName = row[1];
-          if (buildingName && buildingName.toString().trim().toLowerCase() === building.trim().toLowerCase()) {
-            totalValue = row[14] || "N/A";
-            monthValues = row.slice(2, 11).map(v => parseFloat(v) || 0); // Jan–Sep
-            found = true;
-            break;
+      new Chart(document.getElementById('energyChart'), {
+        type: 'pie',
+        data: {
+          labels: data.months,
+          datasets: [{
+            data: data.values,
+            backgroundColor: [
+              '#00796b', '#26a69a', '#80cbc4', '#004d40', '#009688',
+              '#4db6ac', '#b2dfdb', '#00695c', '#00897b'
+            ]
+          }]
+        },
+        options: {
+          plugins: {
+            title: {
+              display: true,
+              text: 'Monthly Energy Consumption',
+              font: { size: 18 }
+            },
+            legend: { position: 'bottom' }
           }
         }
-
-        if (!found) throw new Error(`Building "${building}" not found in ${sheetName}.`);
-
-        // Update page values
-        document.getElementById("energyValue").textContent = totalValue.toLocaleString();
-        document.getElementById("carbonValue").textContent = "0";
-
-        // Render chart
-        const months = ["Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25","Jul-25","Aug-25","Sep-25"];
-        renderPieChart(months, monthValues);
-
-      } catch (err) {
-        console.error(err);
-        document.body.innerHTML = `<h2>❌ Error loading data: ${err.message}</h2>`;
-      }
+      });
     }
 
-    function goBack() {
-      window.location.href = "index.html";
-    }
-
-    window.onload = loadDetails;
+    renderChart();
   </script>
 </body>
 </html>
