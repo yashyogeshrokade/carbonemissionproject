@@ -17,15 +17,15 @@
     <!-- Carbon Emission Chart -->
     <div class="bg-white p-8 rounded-2xl shadow-lg w-3/4 md:w-5/12 text-center">
       <h2 id="buildingTitleCarbon" class="text-2xl font-semibold text-green-700 mb-4"></h2>
-      <canvas id="carbonChart" class="mx-auto" width="600" height="400"></canvas>
-      <p id="carbonTotal" class="text-lg text-gray-700 mt-4"></p>
+      <canvas id="carbonChart" class="mx-auto" width="400" height="400"></canvas>
+      <p id="carbonTotal" class="text-lg text-gray-700 mt-4 font-semibold"></p>
     </div>
 
     <!-- Energy Chart -->
     <div class="bg-white p-8 rounded-2xl shadow-lg w-3/4 md:w-5/12 text-center">
       <h2 id="buildingTitleEnergy" class="text-2xl font-semibold text-red-800 mb-4"></h2>
-      <canvas id="energyChart" class="mx-auto" width="600" height="400"></canvas>
-      <p id="energyTotal" class="text-lg text-gray-700 mt-4"></p>
+      <canvas id="energyChart" class="mx-auto" width="400" height="400"></canvas>
+      <p id="energyTotal" class="text-lg text-gray-700 mt-4 font-semibold"></p>
     </div>
   </div>
 
@@ -54,7 +54,7 @@
       loadCarbon(buildingName);
     }
 
-    // ===== ENERGY CHART (your existing code unchanged) =====
+    // ===== ENERGY PIE CHART =====
     function loadEnergy(buildingName) {
       fetch('energy.xlsx')
         .then(response => response.arrayBuffer())
@@ -63,17 +63,7 @@
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-          let headers = jsonData[1].slice(2, 14);
-
-          headers = headers.map(val => {
-            if (typeof val === "number") {
-              const date = XLSX.SSF.parse_date_code(val);
-              const jsDate = new Date(date.y, date.m - 1, date.d);
-              return jsDate.toLocaleString('default', { month: 'short', year: 'numeric' });
-            }
-            return val;
-          });
-
+          const headers = jsonData[1].slice(2, 11); // Columns C–K only
           const rows = jsonData.slice(2);
           const normalize = str => str.toLowerCase().replace(/[\s\-\(\)]/g, '');
           const target = normalize(buildingName);
@@ -84,114 +74,89 @@
             return;
           }
 
-          const monthlyValues = buildingRow.slice(2, 14).map(Number);
+          const monthlyValues = buildingRow.slice(2, 11).map(Number);
           const totalEnergy = monthlyValues.reduce((a, b) => a + (b || 0), 0);
 
           document.getElementById('energyTotal').innerHTML = `
-            <strong>Total Energy:</strong> ${totalEnergy.toLocaleString()} kWh
+            Total Energy: ${totalEnergy.toLocaleString()} kWh
           `;
 
           const ctx = document.getElementById('energyChart').getContext('2d');
           new Chart(ctx, {
-            type: 'bar',
+            type: 'pie',
             data: {
               labels: headers,
               datasets: [{
                 label: 'Energy Consumption (kWh)',
                 data: monthlyValues,
-                backgroundColor: 'rgba(153, 27, 27, 0.7)',
-                borderColor: '#7f1d1d',
-                borderWidth: 1
+                backgroundColor: [
+                  '#7f1d1d', '#991b1b', '#b91c1c', '#dc2626', '#ef4444',
+                  '#f87171', '#fca5a5', '#fee2e2', '#b91c1c'
+                ],
               }]
             },
             options: {
               responsive: true,
-              scales: {
-                y: { beginAtZero: true }
-              },
               plugins: {
-                title: {
-                  display: true,
-                  text: `Monthly Energy Consumption for ${buildingName}`
-                }
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'Monthly Energy Consumption (kWh)' }
               }
             }
           });
-        })
-        .catch(() => {
-          document.getElementById('error').innerText = "Error loading or reading Energy Excel file.";
         });
     }
 
-    // ===== NEW: CARBON EMISSION CHART =====
+    // ===== CARBON PIE CHART =====
     function loadCarbon(buildingName) {
-      fetch('carbon_emission.xlsx')
+      fetch('carbon.xlsx')
         .then(response => response.arrayBuffer())
         .then(data => {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-          let headers = jsonData[1].slice(2, 14);
-
-          headers = headers.map(val => {
-            if (typeof val === "number") {
-              const date = XLSX.SSF.parse_date_code(val);
-              const jsDate = new Date(date.y, date.m - 1, date.d);
-              return jsDate.toLocaleString('default', { month: 'short', year: 'numeric' });
-            }
-            return val;
-          });
-
+          const headers = jsonData[1].slice(2, 11); // Columns C–K only
           const rows = jsonData.slice(2);
           const normalize = str => str.toLowerCase().replace(/[\s\-\(\)]/g, '');
           const target = normalize(buildingName);
           const buildingRow = rows.find(row => normalize(row[1]) === target);
 
           if (!buildingRow) {
-            document.getElementById('error').innerText = "No data found for this building (carbon emission).";
+            document.getElementById('error').innerText = "No data found for this building (carbon).";
             return;
           }
 
-          const monthlyValues = buildingRow.slice(2, 14).map(Number);
+          const monthlyValues = buildingRow.slice(2, 11).map(v => Number(v) || 0); // Treat missing as 0
           const totalCarbon = monthlyValues.reduce((a, b) => a + (b || 0), 0);
 
           document.getElementById('carbonTotal').innerHTML = `
-            <strong>Total Carbon Emission:</strong> ${totalCarbon.toLocaleString()} kg CO₂
+            Total Carbon Emission: ${totalCarbon.toLocaleString()} kg CO₂
           `;
 
           const ctx = document.getElementById('carbonChart').getContext('2d');
           new Chart(ctx, {
-            type: 'bar',
+            type: 'pie',
             data: {
               labels: headers,
               datasets: [{
                 label: 'Carbon Emission (kg CO₂)',
                 data: monthlyValues,
-                backgroundColor: 'rgba(16, 185, 129, 0.7)',
-                borderColor: '#047857',
-                borderWidth: 1
+                backgroundColor: [
+                  '#065f46', '#047857', '#059669', '#10b981', '#34d399',
+                  '#6ee7b7', '#a7f3d0', '#d1fae5', '#065f46'
+                ],
               }]
             },
             options: {
               responsive: true,
-              scales: {
-                y: { beginAtZero: true }
-              },
               plugins: {
-                title: {
-                  display: true,
-                  text: `Monthly Carbon Emission for ${buildingName}`
-                }
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'Monthly Carbon Emission (kg CO₂)' }
               }
             }
           });
-        })
-        .catch(() => {
-          document.getElementById('error').innerText = "Error loading or reading Carbon Excel file.";
         });
     }
   </script>
 </body>
 </html>
-
