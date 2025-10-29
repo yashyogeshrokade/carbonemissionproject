@@ -1,115 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Energy Consumption Details</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
+<body class="bg-gray-100">
 
-<body class="bg-gray-50 flex flex-col items-center justify-center min-h-screen">
-  <div class="w-full bg-red-900 text-white py-4 text-center text-3xl font-bold shadow-lg">
+  <div class="bg-red-800 text-white text-center py-5 text-3xl font-bold shadow-md">
     Energy Consumption Details
   </div>
 
-  <div class="bg-white rounded-2xl shadow-2xl p-8 m-8 w-4/5 md:w-2/3 lg:w-1/2 text-center">
-    <h2 id="buildingName" class="text-2xl font-semibold text-red-800 mb-4"></h2>
-    <p id="totalEnergy" class="text-lg font-medium mb-2 text-gray-700"></p>
-    <p id="carbonEmission" class="text-lg font-medium mb-6 text-gray-700"></p>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <canvas id="barChart" class="p-4"></canvas>
-      <canvas id="pieChart" class="p-4"></canvas>
+  <div class="flex justify-center mt-8">
+    <div class="bg-white shadow-lg rounded-2xl p-8 w-full max-w-3xl text-center">
+      <h2 id="buildingName" class="text-2xl font-semibold text-red-800 mb-4"></h2>
+      <canvas id="energyChart" height="120"></canvas>
+      <p id="total" class="mt-6 text-lg font-bold text-red-700"></p>
+      <button onclick="history.back()" class="mt-8 bg-red-800 text-white px-6 py-2 rounded-lg hover:bg-red-700">← Back</button>
     </div>
-
-    <button onclick="history.back()" class="mt-8 bg-red-900 text-white px-6 py-2 rounded-full hover:bg-red-700 transition">
-      ← Back
-    </button>
   </div>
 
   <script>
-    // Function to get building name from query string
-    function getParameterByName(name) {
-      const url = window.location.href;
-      name = name.replace(/[\[\]]/g, "\\$&");
-      const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
-      const results = regex.exec(url);
-      if (!results) return null;
-      if (!results[2]) return '';
-      return decodeURIComponent(results[2].replace(/\+/g, " "));
-    }
+    // Get the selected building data from localStorage
+    const building = JSON.parse(localStorage.getItem("selectedBuilding"));
 
-    const buildingName = getParameterByName("building");
-    document.getElementById("buildingName").textContent = buildingName + " (academic)";
+    if (!building) {
+      document.body.innerHTML = `
+        <div class="text-center mt-20 text-red-700 text-xl">
+          Error loading data. Please go back and select a building again.
+        </div>`;
+    } else {
+      // Use correct key name from Excel
+      const name = building["Building Name"] || building["Building"] || "Unknown";
 
-    // Load Excel file
-    fetch("energy.xlsx")
-      .then(res => res.arrayBuffer())
-      .then(data => {
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json(sheet, { defval: 0 });
+      document.getElementById("buildingName").textContent = name;
 
-        // Find building
-        const building = json.find(row => row["Building Name"]?.trim().toLowerCase() === buildingName.trim().toLowerCase());
+      // Extract monthly data (columns with -25)
+      const months = Object.keys(building).filter(k => k.includes("-25"));
+      const values = months.map(m => Number(building[m]) || 0);
 
-        if (building) {
-          const months = ["Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25","Jul-25","Aug-25","Sep-25"];
-          const values = months.map(m => parseFloat(building[m]) || 0);
-          const totalEnergy = parseFloat(building["Total"]) || 0;
-          const totalCarbon = 0; // Placeholder (to be updated later)
-
-          document.getElementById("totalEnergy").textContent = `Total Energy (Jan–Sep 2025): ${totalEnergy.toLocaleString()} kWh`;
-          document.getElementById("carbonEmission").textContent = `Total Carbon Emissions: ${totalCarbon} kg CO₂e`;
-
-          // Chart colors
-          const colors = ["#7f1d1d", "#991b1b", "#b91c1c", "#f59e0b", "#fbbf24", "#fef3c7", "#2563eb", "#0284c7", "#0ea5e9"];
-
-          // Bar Chart
-          new Chart(document.getElementById("barChart"), {
-            type: "bar",
-            data: {
-              labels: months,
-              datasets: [{
-                label: "Energy (kWh)",
-                data: values,
-                backgroundColor: colors,
-              }]
-            },
-            options: {
-              plugins: {
-                title: { display: true, text: "Monthly Energy Consumption" },
-                legend: { display: false }
-              },
-              scales: { y: { beginAtZero: true } }
+      // Create chart
+      const ctx = document.getElementById("energyChart").getContext("2d");
+      new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: months,
+          datasets: [{
+            label: "Electricity Consumption (kWh)",
+            data: values,
+            backgroundColor: "#8B1C1C",
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: {
+              display: true,
+              text: "Monthly Electricity Consumption",
+              color: "#8B1C1C",
+              font: { size: 16, weight: "bold" }
             }
-          });
-
-          // Pie Chart
-          new Chart(document.getElementById("pieChart"), {
-            type: "pie",
-            data: {
-              labels: months,
-              datasets: [{
-                data: values,
-                backgroundColor: colors,
-              }]
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: "Consumption (kWh)" }
             },
-            options: {
-              plugins: { title: { display: true, text: "Monthly Energy Distribution (kWh)" } }
+            x: {
+              title: { display: true, text: "Month" }
             }
-          });
-
-        } else {
-          document.querySelector(".grid").innerHTML = "<p class='text-red-700 text-lg font-medium'>No data found for this building.</p>";
+          }
         }
-      })
-      .catch(err => {
-        console.error(err);
-        document.querySelector(".grid").innerHTML = "<p class='text-red-700 text-lg font-medium'>Error loading data.</p>";
       });
+
+      // Display total
+      const total = building["Total"] || building["TOTAL"] || 0;
+      document.getElementById("total").textContent = `Total Consumption: ${total} kWh`;
+    }
   </script>
+
 </body>
 </html>
