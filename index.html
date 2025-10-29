@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Building Energy Consumption Dashboard</title>
+
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background-image: url("photo_NAC.png");
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      color: #222;
+      position: relative;
+      filter: brightness(1.15) contrast(1.1) saturate(1.15);
+      overflow: hidden; /* Disable full-page scroll, handled by wrapper */
+    }
+
+    /* Scrollable wrapper for page 1 */
+    #mainWrapper {
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      min-width: 360px;
+      max-width: 420px;
+      margin: 100px auto;
+      backdrop-filter: blur(8px);
+      transition: 0.4s ease-in-out;
+      animation: fadeIn 1s ease;
+    }
+
+    h1 {
+      color: #004aad;
+      font-size: 22px;
+      margin-bottom: 25px;
+    }
+
+    label {
+      font-weight: bold;
+      color: #333;
+    }
+
+    select {
+      width: 90%;
+      padding: 10px;
+      margin: 10px 0 20px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      outline: none;
+      font-size: 14px;
+    }
+
+    button {
+      background-color: #004aad;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background-color: #003b8a;
+    }
+
+    .result {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    footer {
+      position: relative;
+      bottom: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 12px;
+      padding: 10px 0;
+      color: #555;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="mainWrapper">
+    <div id="homePage" class="container">
+      <h1>Building Energy Consumption Dashboard</h1>
+
+      <label for="typeSelect">Select Type:</label><br />
+      <select id="typeSelect" onchange="updateBuildingOptions()">
+        <option value="">-- Choose Type --</option>
+        <option value="academic">Academic Building</option>
+        <option value="hostel">Hostel</option>
+      </select>
+      <br />
+
+      <label for="buildingSelect">Select Building:</label><br />
+      <select id="buildingSelect">
+        <option value="">-- Choose a Building --</option>
+      </select>
+      <br />
+
+      <button onclick="loadEnergy()">Show Total</button>
+      <div class="result" id="result"></div>
+    </div>
+  </div>
+
+  <footer>© 2025 Indian Institute of Technology Madras</footer>
+
+  <script>
+    // Function to populate building options
+    function updateBuildingOptions() {
+      const type = document.getElementById("typeSelect").value;
+      const buildingSelect = document.getElementById("buildingSelect");
+
+      buildingSelect.innerHTML = '<option value="">-- Choose a Building --</option>';
+
+      const academicBuildings = ["CRC", "MSB", "EE Dept", "HSB"];
+      const hostels = ["Sharav", "Alakananda", "Mandak", "Ganga"];
+
+      const list = type === "academic" ? academicBuildings : hostels;
+
+      list.forEach(b => {
+        const option = document.createElement("option");
+        option.value = b;
+        option.textContent = b;
+        buildingSelect.appendChild(option);
+      });
+    }
+
+    // Function to move to details page
+    function loadEnergy() {
+      const building = document.getElementById("buildingSelect").value;
+      const type = document.getElementById("typeSelect").value;
+
+      if (building === "" || type === "") {
+        alert("Please select both type and building.");
+        return;
+      }
+
+      // Store data in localStorage for details page
+      localStorage.setItem("selectedBuilding", building);
+      localStorage.setItem("selectedType", type);
+
+      // Redirect to details page
+      window.location.href = "details.html";
+    }
+  </script>
+</body>
+</html>
