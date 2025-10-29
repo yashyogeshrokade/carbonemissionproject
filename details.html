@@ -4,84 +4,164 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Energy Consumption Details</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      background-color: #f6f7f9;
+    }
+    header {
+      background-color: #8b1414;
+      color: white;
+      padding: 20px 0;
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    canvas {
+      width: 100%;
+      max-height: 400px;
+    }
+    button {
+      display: block;
+      margin: 25px auto 0;
+      padding: 10px 18px;
+      background-color: #8b1414;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover {
+      background-color: #a61c1c;
+    }
+    #totalEnergy {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    #errorMsg {
+      color: red;
+      text-align: center;
+      font-weight: 500;
+    }
+  </style>
 </head>
-<body class="bg-gray-100">
+<body>
+  <header>Energy Consumption Details</header>
 
-  <div class="bg-red-800 text-white text-center py-5 text-3xl font-bold shadow-md">
-    Energy Consumption Details
-  </div>
-
-  <div class="flex justify-center mt-8">
-    <div class="bg-white shadow-lg rounded-2xl p-8 w-full max-w-3xl text-center">
-      <h2 id="buildingName" class="text-2xl font-semibold text-red-800 mb-4"></h2>
-      <canvas id="energyChart" height="120"></canvas>
-      <p id="total" class="mt-6 text-lg font-bold text-red-700"></p>
-      <button onclick="history.back()" class="mt-8 bg-red-800 text-white px-6 py-2 rounded-lg hover:bg-red-700">← Back</button>
-    </div>
+  <div class="container">
+    <div id="totalEnergy"></div>
+    <canvas id="barChart"></canvas>
+    <p id="errorMsg"></p>
+    <button onclick="window.location.href='index.html'">← Back</button>
   </div>
 
   <script>
-    // Get the selected building data from localStorage
-    const building = JSON.parse(localStorage.getItem("selectedBuilding"));
+    document.addEventListener("DOMContentLoaded", loadBuildingData);
 
-    if (!building) {
-      document.body.innerHTML = `
-        <div class="text-center mt-20 text-red-700 text-xl">
-          Error loading data. Please go back and select a building again.
-        </div>`;
-    } else {
-      // Use correct key name from Excel
-      const name = building["Building Name"] || building["Building"] || "Unknown";
+    function loadBuildingData() {
+      const params = new URLSearchParams(window.location.search);
+      const building = params.get("building");
+      const type = params.get("type");
 
-      document.getElementById("buildingName").textContent = name;
+      if (!building || !type) {
+        document.getElementById("errorMsg").textContent = "Invalid building selection.";
+        return;
+      }
 
-      // Extract monthly data (columns with -25)
-      const months = Object.keys(building).filter(k => k.includes("-25"));
-      const values = months.map(m => Number(building[m]) || 0);
+      fetch("energy.xlsx")
+        .then(res => res.arrayBuffer())
+        .then(data => {
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheetName = type === "academic" ? workbook.SheetNames[0] : workbook.SheetNames[1];
+          const sheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(sheet);
 
-      // Create chart
-      const ctx = document.getElementById("energyChart").getContext("2d");
-      new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: months,
-          datasets: [{
-            label: "Electricity Consumption (kWh)",
-            data: values,
-            backgroundColor: "#8B1C1C",
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { display: false },
-            title: {
-              display: true,
-              text: "Monthly Electricity Consumption",
-              color: "#8B1C1C",
-              font: { size: 16, weight: "bold" }
-            }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              title: { display: true, text: "Consumption (kWh)" }
-            },
-            x: {
-              title: { display: true, text: "Month" }
-            }
+          const buildingData = json.find(
+            row => String(row["Building Name"]).trim().toLowerCase() === building.toLowerCase()
+          );
+
+          if (!buildingData) {
+            document.getElementById("errorMsg").textContent =
+              "Building data not found in the Excel file.";
+            return;
           }
-        }
-      });
 
-      // Display total
-      const total = building["Total"] || building["TOTAL"] || 0;
-      document.getElementById("total").textContent = `Total Consumption: ${total} kWh`;
+          // Extract month-wise data
+          const months = Object.keys(buildingData).filter(
+            key => !["Building Name", "Type"].includes(key)
+          );
+          const values = months.map(m => Number(buildingData[m]) || 0);
+
+          // Calculate total
+          const total = values.reduce((a, b) => a + b, 0);
+          document.getElementById("totalEnergy").textContent =
+            `Total Annual Energy Consumption: ${total.toFixed(2)} kWh`;
+
+          // Bar Chart
+          const ctx = document.getElementById("barChart").getContext("2d");
+          new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: months,
+              datasets: [
+                {
+                  label: "Monthly Energy (kWh)",
+                  data: values,
+                  backgroundColor: "#8b1414a0",
+                  borderColor: "#8b1414",
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: "Energy (kWh)",
+                  },
+                },
+                x: {
+                  title: {
+                    display: true,
+                    text: "Month",
+                  },
+                },
+              },
+              plugins: {
+                legend: { display: false },
+                title: {
+                  display: true,
+                  text: "Monthly Energy Consumption Chart",
+                  font: { size: 18 },
+                },
+              },
+            },
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          document.getElementById("errorMsg").textContent =
+            "Error loading Excel file. Ensure 'energy.xlsx' is in the same folder.";
+        });
     }
   </script>
-
 </body>
 </html>
+
