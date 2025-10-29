@@ -1,165 +1,101 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IITM Energy Dashboard - Details</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script>
+  async function loadBuildingDetails() {
+    const building = localStorage.getItem("selectedBuilding");
+    const type = localStorage.getItem("selectedType");
 
-  <style>
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      background-image: url("photo_NAC.png");
-      background-repeat: no-repeat;
-      background-size: cover;
-      background-position: center;
-      background-attachment: fixed;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-      height: 100vh;
-      overflow-y: auto;
-      color: #222;
-      position: relative;
-      filter: brightness(1.15) contrast(1.1) saturate(1.15);
+    if (!building || !type) {
+      alert("No building data found. Redirecting...");
+      window.location.href = "index.html";
+      return;
     }
 
-    .detail-page {
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 16px;
-      padding: 40px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-      min-width: 360px;
-      max-width: 420px;
-      margin: 100px auto;
-      backdrop-filter: blur(6px);
-      animation: fadeIn 0.6s ease;
-    }
+    document.getElementById("buildingTitle").textContent = building;
+    document.getElementById("buildingType").textContent = type.toUpperCase();
 
-    h1 {
-      color: #7b1113;
-      font-weight: 700;
-      font-size: 28px;
-      margin-bottom: 20px;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-    }
+    try {
+      const response = await fetch("energy.xlsx");
+      if (!response.ok) throw new Error("Excel file not found.");
 
-    .detail-item {
-      margin: 20px 0;
-      text-align: left;
-      font-size: 17px;
-    }
+      const data = await response.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheetName = "Sheet1"; // Academic buildings in your case
+      const sheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    .detail-item span {
-      color: #7b1113;
-      font-weight: bold;
-    }
+      const monthNames = [
+        "Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25",
+        "Jul-25","Aug-25","Sep-25"
+      ];
 
-    .back-btn {
-      margin-top: 25px;
-      background-color: #7b1113;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: 0.3s;
-    }
+      let found = false;
+      let monthlyValues = [];
+      let totalValue = "N/A";
 
-    .back-btn:hover {
-      background-color: #a41b1e;
-    }
+      for (let i = 3; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length < 15) continue;
 
-    footer {
-      position: fixed;
-      bottom: 10px;
-      width: 100%;
-      font-size: 14px;
-      color: #333;
-      text-shadow: 1px 1px 2px rgba(255,255,255,0.6);
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
-</head>
-
-<body>
-  <div id="detailPage" class="detail-page">
-    <h1 id="buildingTitle"></h1>
-    <div class="detail-item">
-      <span>Type:</span> <span id="buildingType"></span>
-    </div>
-    <div class="detail-item">
-      <span>Energy Consumption:</span> <span id="energyValue"></span> kWh
-    </div>
-    <div class="detail-item">
-      <span>Carbon Emission:</span> <span id="carbonValue"></span> tCO₂e
-    </div>
-    <button class="back-btn" onclick="goBack()">← Back</button>
-  </div>
-
-  <footer>© 2025 Indian Institute of Technology Madras</footer>
-
-  <script>
-    async function loadBuildingDetails() {
-      const type = localStorage.getItem('selectedType');
-      const building = localStorage.getItem('selectedBuilding');
-
-      if (!type || !building) {
-        alert("No building selected. Redirecting...");
-        window.location.href = "index.html";
-        return;
+        const buildingName = row[1];
+        if (
+          buildingName &&
+          buildingName.toString().trim().toLowerCase() === building.trim().toLowerCase()
+        ) {
+          monthlyValues = row.slice(2, 11).map(v => parseFloat(v) || 0);
+          totalValue = row[14] || "N/A";
+          found = true;
+          break;
+        }
       }
 
-      document.getElementById("buildingTitle").textContent = building;
-      document.getElementById("buildingType").textContent = type.toUpperCase();
+      document.getElementById("energyValue").textContent = totalValue.toLocaleString();
+      document.getElementById("carbonValue").textContent = found ? "0" : "N/A";
 
-      try {
-        const response = await fetch('energy.xlsx');
-        if (!response.ok) throw new Error('Excel file not found.');
+      if (found) {
+        renderPieChart(monthNames, monthlyValues);
+      } else {
+        console.warn("Building not found in Excel sheet.");
+      }
+    } catch (err) {
+      console.error(err);
+      document.getElementById("energyValue").textContent = "Error loading data";
+      document.getElementById("carbonValue").textContent = "Error";
+    }
+  }
 
-        const data = await response.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = type === "academic" ? "Sheet1" : "Sheet2";
-        const sheet = workbook.Sheets[sheetName];
-        if (!sheet) throw new Error(`${sheetName} not found in Excel file.`);
-
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        let found = false, totalValue = "N/A";
-
-        for (let i = 0; i < jsonData.length; i++) {
-          const row = jsonData[i];
-          if (!row || row.length < 15) continue;
-          const buildingName = row[1];
-          const total = row[14];
-
-          if (buildingName && buildingName.toString().trim().toLowerCase() === building.trim().toLowerCase()) {
-            totalValue = total || "N/A";
-            found = true;
-            break;
+  function renderPieChart(labels, data) {
+    const ctx = document.getElementById("energyChart").getContext("2d");
+    new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels: labels,
+        datasets: [{
+          data: data,
+          backgroundColor: [
+            "#f94144","#f3722c","#f8961e","#f9844a","#f9c74f",
+            "#90be6d","#43aa8b","#577590","#277da1"
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { font: { size: 14 } }
+          },
+          title: {
+            display: true,
+            text: "Monthly Energy Consumption (kWh)",
+            font: { size: 18 }
           }
         }
-
-        document.getElementById("energyValue").textContent = found ? totalValue.toLocaleString() : "N/A";
-        document.getElementById("carbonValue").textContent = found ? "0" : "N/A";
-
-      } catch (err) {
-        console.error(err);
-        document.getElementById("energyValue").textContent = "Error loading data";
-        document.getElementById("carbonValue").textContent = "Error";
       }
-    }
+    });
+  }
 
-    function goBack() {
-      window.location.href = "index.html";
-    }
+  function goBack() {
+    window.location.href = "index.html";
+  }
 
-    window.onload = loadBuildingDetails;
-  </script>
-</body>
-</html>
-
+  window.onload = loadBuildingDetails;
+</script>
