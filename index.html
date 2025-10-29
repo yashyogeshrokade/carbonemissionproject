@@ -3,69 +3,160 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IISc Energy Dashboard</title>
+  <title>IITM Energy Dashboard</title>
+
   <style>
     body {
-      font-family: 'Poppins', sans-serif;
-      background: linear-gradient(to right, #e0f7fa, #ffffff);
+      font-family: "Segoe UI", Arial, sans-serif;
+      background-image: url("photo_NAC.png");
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
       text-align: center;
       margin: 0;
-      padding: 40px;
+      padding: 0;
+      height: 100vh;
+      overflow-y: auto;
+      color: #222;
+      position: relative;
+      filter: brightness(1.15) contrast(1.1) saturate(1.15);
     }
+
     h1 {
-      color: #004d40;
+      color: #7b1113;
+      font-weight: 700;
+      font-size: 28px;
+      margin-bottom: 20px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
     }
-    .building-list {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 15px;
-      margin-top: 30px;
+
+    .container {
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      min-width: 360px;
+      max-width: 420px;
+      margin: 100px auto;
+      backdrop-filter: blur(8px);
+      animation: fadeIn 1s ease;
     }
-    button {
-      background-color: #00796b;
-      color: white;
-      border: none;
-      padding: 12px 18px;
-      border-radius: 10px;
+
+    select, button {
+      padding: 10px 15px;
+      margin: 10px;
       font-size: 16px;
-      cursor: pointer;
-      transition: 0.3s;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      transition: all 0.3s ease;
     }
+
+    select:focus, button:focus {
+      outline: none;
+      border-color: #7b1113;
+      box-shadow: 0 0 5px rgba(123,17,19,0.5);
+    }
+
+    button {
+      background-color: #7b1113;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
     button:hover {
-      background-color: #004d40;
+      background-color: #a41b1e;
+    }
+
+    .result {
+      margin-top: 25px;
+      font-size: 17px;
+      color: #333;
+      font-weight: bold;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 10px;
+      width: 100%;
+      font-size: 14px;
+      color: #333;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.6);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
-<body>
-  <h1>⚡ IISc Academic Buildings Energy Dashboard (2025)</h1>
-  <p>Select a building to view details and energy breakdown.</p>
 
-  <div class="building-list">
-    <button onclick="showDetails('SAIF','academic')">SAIF</button>
-    <button onclick="showDetails('MSRC','academic')">MSRC</button>
-    <button onclick="showDetails('Chemistry Block','academic')">Chemistry Block</button>
-    <button onclick="showDetails('CRYO','academic')">CRYO</button>
-    <button onclick="showDetails('BSB','academic')">BSB</button>
-    <button onclick="showDetails('Structural','academic')">Structural</button>
-    <button onclick="showDetails('Biotech-1','academic')">Biotech-1</button>
-    <button onclick="showDetails('Biotech-2','academic')">Biotech-2</button>
-    <button onclick="showDetails('ED Block','academic')">ED Block</button>
-    <button onclick="showDetails('MDS','academic')">MDS</button>
-    <button onclick="showDetails('CFD','academic')">CFD</button>
-    <button onclick="showDetails('NAC-I','academic')">NAC-I</button>
-    <button onclick="showDetails('NAC-II','academic')">NAC-II</button>
-    <button onclick="showDetails('Ranganathan Building','academic')">Ranganathan Building</button>
-    <button onclick="showDetails('Central Library','academic')">Central Library</button>
-    <button onclick="showDetails('DOMS','academic')">DOMS</button>
+<body>
+  <div id="homePage" class="container">
+    <h1>Building Energy Consumption Dashboard</h1>
+
+    <label for="typeSelect"><b>Select Type:</b></label><br>
+    <select id="typeSelect" onchange="updateBuildingOptions()">
+      <option value="">-- Choose Type --</option>
+      <option value="academic">Academic Building</option>
+      <option value="hostel">Hostel</option>
+    </select><br>
+
+    <label for="buildingSelect"><b>Select Building:</b></label><br>
+    <select id="buildingSelect">
+      <option value="">-- Choose a Building --</option>
+    </select><br>
+
+    <button onclick="goToDetails()">Show Total</button>
+    <div class="result" id="result"></div>
   </div>
 
+  <footer>© 2025 Indian Institute of Technology Madras</footer>
+
   <script>
-    function showDetails(building, type) {
-      const url = `details.html?building=${encodeURIComponent(building)}&type=${encodeURIComponent(type)}`;
-      window.location.href = url;
+    const academicBuildings = [
+      "SAIF", "MSRC", "Chemistry Block", "CRYO", "BSB", "Structural",
+      "Biotech-1", "Biotech-2", "ED Block", "MDS", "CFD", "NAC-I", "NAC-II",
+      "Ranganathan Building", "Central Library", "DOMS"
+    ];
+
+    const hostelBuildings = [
+      "Sharavathi", "Godavari", "Alakananda", "Ganga", "Jamuna", "Narmada",
+      "Saraswathi", "Tapti", "Sindhu", "Brahmaputra", "Tunga", "Krishna",
+      "Cauvery", "Mahanadhi", "Mandakini", "Pampa", "Tamiraparani"
+    ];
+
+    function updateBuildingOptions() {
+      const type = document.getElementById("typeSelect").value;
+      const select = document.getElementById("buildingSelect");
+      select.innerHTML = '<option value="">-- Choose a Building --</option>';
+      const list = type === "hostel" ? hostelBuildings : (type === "academic" ? academicBuildings : []);
+      list.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+    }
+
+    function goToDetails() {
+      const type = document.getElementById('typeSelect').value;
+      const building = document.getElementById('buildingSelect').value;
+      const resultDiv = document.getElementById('result');
+
+      if (!type || !building) {
+        resultDiv.innerHTML = "⚠ Please select both type and building.";
+        return;
+      }
+
+      // store selection in localStorage
+      localStorage.setItem("selectedType", type);
+      localStorage.setItem("selectedBuilding", building);
+
+      // go to details page
+      window.location.href = "details.html";
     }
   </script>
 </body>
 </html>
-
