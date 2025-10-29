@@ -1,101 +1,199 @@
-<script>
-  async function loadBuildingDetails() {
-    const building = localStorage.getItem("selectedBuilding");
-    const type = localStorage.getItem("selectedType");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Building Details - IITM Energy Dashboard</title>
 
-    if (!building || !type) {
-      alert("No building data found. Redirecting...");
-      window.location.href = "index.html";
-      return;
+  <!-- Excel + Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background-image: url("photo_NAC.png");
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      color: #222;
+      filter: brightness(1.15) contrast(1.1) saturate(1.15);
     }
 
-    document.getElementById("buildingTitle").textContent = building;
-    document.getElementById("buildingType").textContent = type.toUpperCase();
-
-    try {
-      const response = await fetch("energy.xlsx");
-      if (!response.ok) throw new Error("Excel file not found.");
-
-      const data = await response.arrayBuffer();
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheetName = "Sheet1"; // Academic buildings in your case
-      const sheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-      const monthNames = [
-        "Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25",
-        "Jul-25","Aug-25","Sep-25"
-      ];
-
-      let found = false;
-      let monthlyValues = [];
-      let totalValue = "N/A";
-
-      for (let i = 3; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        if (!row || row.length < 15) continue;
-
-        const buildingName = row[1];
-        if (
-          buildingName &&
-          buildingName.toString().trim().toLowerCase() === building.trim().toLowerCase()
-        ) {
-          monthlyValues = row.slice(2, 11).map(v => parseFloat(v) || 0);
-          totalValue = row[14] || "N/A";
-          found = true;
-          break;
-        }
-      }
-
-      document.getElementById("energyValue").textContent = totalValue.toLocaleString();
-      document.getElementById("carbonValue").textContent = found ? "0" : "N/A";
-
-      if (found) {
-        renderPieChart(monthNames, monthlyValues);
-      } else {
-        console.warn("Building not found in Excel sheet.");
-      }
-    } catch (err) {
-      console.error(err);
-      document.getElementById("energyValue").textContent = "Error loading data";
-      document.getElementById("carbonValue").textContent = "Error";
+    .detail-page {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      min-width: 360px;
+      max-width: 420px;
+      margin: 100px auto;
+      backdrop-filter: blur(6px);
+      animation: fadeIn 0.6s ease;
     }
-  }
 
-  function renderPieChart(labels, data) {
-    const ctx = document.getElementById("energyChart").getContext("2d");
-    new Chart(ctx, {
-      type: "pie",
-      data: {
-        labels: labels,
-        datasets: [{
-          data: data,
-          backgroundColor: [
-            "#f94144","#f3722c","#f8961e","#f9844a","#f9c74f",
-            "#90be6d","#43aa8b","#577590","#277da1"
-          ],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: { font: { size: 14 } }
-          },
-          title: {
-            display: true,
-            text: "Monthly Energy Consumption (kWh)",
-            font: { size: 18 }
+    h1 {
+      color: #7b1113;
+      font-weight: 700;
+      font-size: 28px;
+      margin-bottom: 25px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .detail-item {
+      margin: 15px 0;
+      text-align: left;
+      font-size: 17px;
+    }
+
+    .detail-item span {
+      color: #7b1113;
+      font-weight: bold;
+    }
+
+    .back-btn {
+      margin-top: 25px;
+      background-color: #7b1113;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: 0.3s;
+    }
+
+    .back-btn:hover {
+      background-color: #a41b1e;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 10px;
+      width: 100%;
+      font-size: 14px;
+      color: #333;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.6);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="detail-page">
+    <h1 id="buildingTitle">Building Details</h1>
+
+    <div class="detail-item"><span>Type:</span> <span id="buildingType"></span></div>
+    <div class="detail-item"><span>Energy Consumption:</span> <span id="energyValue"></span> kWh</div>
+    <div class="detail-item"><span>Carbon Emission:</span> <span id="carbonValue"></span> tCO₂e</div>
+
+    <!-- Pie Chart -->
+    <canvas id="energyChart" width="350" height="350" style="margin-top: 25px;"></canvas>
+
+    <button class="back-btn" onclick="goBack()">← Back</button>
+  </div>
+
+  <footer>© 2025 Indian Institute of Technology Madras</footer>
+
+  <script>
+    // --- PIE CHART FUNCTION ---
+    function renderPieChart(labels, values) {
+      const ctx = document.getElementById('energyChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: [
+              '#7b1113', '#a41b1e', '#d48c8d', '#f2c1c1',
+              '#f7e2e2', '#c94f4f', '#8b0d0d', '#b52d2d', '#e7a1a1'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            title: { display: true, text: 'Monthly Energy Consumption (kWh)' }
           }
         }
+      });
+    }
+
+    // --- LOAD BUILDING DETAILS ---
+    async function loadDetails() {
+      const params = new URLSearchParams(window.location.search);
+      const building = params.get('building');
+      const type = params.get('type');
+
+      if (!building || !type) {
+        document.body.innerHTML = "<h2>⚠ Invalid building or type selection.</h2>";
+        return;
       }
-    });
-  }
 
-  function goBack() {
-    window.location.href = "index.html";
-  }
+      document.getElementById("buildingTitle").textContent = building;
+      document.getElementById("buildingType").textContent = type.toUpperCase();
 
-  window.onload = loadBuildingDetails;
-</script>
+      try {
+        const response = await fetch('energy.xlsx');
+        if (!response.ok) throw new Error('Excel file not found.');
+
+        const data = await response.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = type === "academic" ? "Sheet1" : "Sheet2";
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) throw new Error(`${sheetName} not found.`);
+
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        let totalValue = "N/A";
+        let monthValues = [];
+        let found = false;
+
+        for (let i = 0; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          if (!row || row.length < 15) continue;
+
+          const buildingName = row[1];
+          if (buildingName && buildingName.toString().trim().toLowerCase() === building.trim().toLowerCase()) {
+            totalValue = row[14] || "N/A";
+            monthValues = row.slice(2, 11).map(v => parseFloat(v) || 0); // Jan–Sep
+            found = true;
+            break;
+          }
+        }
+
+        if (!found) throw new Error(`Building "${building}" not found in ${sheetName}.`);
+
+        // Update page values
+        document.getElementById("energyValue").textContent = totalValue.toLocaleString();
+        document.getElementById("carbonValue").textContent = "0";
+
+        // Render chart
+        const months = ["Jan-25","Feb-25","Mar-25","Apr-25","May-25","Jun-25","Jul-25","Aug-25","Sep-25"];
+        renderPieChart(months, monthValues);
+
+      } catch (err) {
+        console.error(err);
+        document.body.innerHTML = `<h2>❌ Error loading data: ${err.message}</h2>`;
+      }
+    }
+
+    function goBack() {
+      window.location.href = "index.html";
+    }
+
+    window.onload = loadDetails;
+  </script>
+</body>
+</html>
