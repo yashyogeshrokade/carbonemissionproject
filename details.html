@@ -3,22 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Energy Consumption Details</title>
+  <title>Building Details</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 
 <body class="bg-gray-100 font-sans">
-  <div class="bg-red-800 text-white text-3xl font-bold text-center py-4">Energy Consumption Details</div>
+  <div class="bg-red-800 text-white text-3xl font-bold text-center py-4">Building Energy & Carbon Emission</div>
 
-  <div class="flex justify-center items-center mt-10">
-    <div class="bg-white p-10 rounded-2xl shadow-lg w-3/4 text-center">
-      <h2 id="buildingTitle" class="text-2xl font-semibold text-red-800 mb-6"></h2>
-      <canvas id="energyChart" class="mx-auto" width="600" height="400"></canvas>
-      <p id="carbonInfo" class="text-lg text-gray-700 mt-4"></p>
-      <p id="error" class="text-red-600 mt-6"></p>
-      <button onclick="goBack()" class="bg-red-800 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded mt-6">← Back</button>
+  <div class="flex justify-center mt-10">
+    <div class="bg-white p-8 rounded-2xl shadow-lg w-11/12">
+      <h2 id="buildingTitle" class="text-2xl font-semibold text-red-800 text-center mb-6"></h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Carbon Emission -->
+        <div class="text-center">
+          <h3 class="text-xl font-bold text-green-800 mb-2">Carbon Emission (kg CO₂)</h3>
+          <canvas id="carbonChart" width="400" height="300"></canvas>
+          <p id="carbonInfo" class="text-gray-700 mt-3"></p>
+        </div>
+
+        <!-- Energy Consumption -->
+        <div class="text-center">
+          <h3 class="text-xl font-bold text-red-800 mb-2">Energy Consumption (kWh)</h3>
+          <canvas id="energyChart" width="400" height="300"></canvas>
+          <p id="energyInfo" class="text-gray-700 mt-3"></p>
+        </div>
+      </div>
+
+      <div class="text-center mt-8">
+        <button onclick="goBack()" class="bg-red-800 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded">← Back</button>
+      </div>
+      <p id="error" class="text-red-600 text-center mt-4"></p>
     </div>
   </div>
 
@@ -29,84 +46,99 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const buildingName = urlParams.get('building');
-    document.getElementById('buildingTitle').innerText = buildingName ? buildingName : "Building Details";
+    document.getElementById('buildingTitle').innerText = buildingName || "Building Details";
 
     if (!buildingName) {
       document.getElementById('error').innerText = "Invalid building selection.";
     } else {
+      loadEnergyData(buildingName);
+      loadCarbonData(buildingName);
+    }
+
+    // 🟥 ENERGY DATA
+    function loadEnergyData(name) {
       fetch('energy.xlsx')
-        .then(response => response.arrayBuffer())
+        .then(res => res.arrayBuffer())
         .then(data => {
           const workbook = XLSX.read(data, { type: 'array' });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const headers = jsonData[1].slice(2, 11); // Jan–Sep
+          const rows = jsonData.slice(2);
 
-          // Extract headers (months)
-          let headers = jsonData[1].slice(2, 14);
+          const clean = s => (s || "").toString().trim().toLowerCase();
+          const row = rows.find(r => clean(r[1]) === clean(name));
 
-          // Convert Excel date serials to month-year strings
-          headers = headers.map(val => {
-            if (typeof val === "number") {
-              const date = XLSX.SSF.parse_date_code(val);
-              const jsDate = new Date(date.y, date.m - 1, date.d);
-              return jsDate.toLocaleString('default', { month: 'short', year: 'numeric' });
-            }
-            return val;
-          });
-
-          const rows = jsonData.slice(2); // Skip header rows
-
-          // Normalize function
-          const normalize = str => str.toLowerCase().replace(/[\s\-\(\)]/g, '');
-          const target = normalize(buildingName);
-
-          // Find building row
-          const buildingRow = rows.find(row => normalize(row[1]) === target);
-
-          if (!buildingRow) {
-            document.getElementById('error').innerText = "No data found for this building.";
+          if (!row) {
+            document.getElementById('error').innerText = "No energy data found.";
             return;
           }
 
-          const monthlyValues = buildingRow.slice(2, 14).map(Number);
-          const totalEnergy = monthlyValues.reduce((a, b) => a + (b || 0), 0);
-          const carbonEmission = 0; // Fixed to zero
+          const monthly = row.slice(2, 11).map(Number);
+          const total = row[11] || 0;
 
-          document.getElementById('carbonInfo').innerHTML = `
-            <strong>Total Energy:</strong> ${totalEnergy.toLocaleString()} kWh<br>
-            <strong>Carbon Emission:</strong> ${carbonEmission.toLocaleString()} kg CO₂
-          `;
-
-          const ctx = document.getElementById('energyChart').getContext('2d');
-          new Chart(ctx, {
+          new Chart(document.getElementById('energyChart'), {
             type: 'bar',
             data: {
               labels: headers,
               datasets: [{
-                label: 'Energy Consumption (kWh)',
-                data: monthlyValues,
+                label: 'Energy (kWh)',
+                data: monthly,
                 backgroundColor: 'rgba(153, 27, 27, 0.7)',
                 borderColor: '#7f1d1d',
                 borderWidth: 1
               }]
             },
-            options: {
-              responsive: true,
-              scales: {
-                y: { beginAtZero: true }
-              },
-              plugins: {
-                title: {
-                  display: true,
-                  text: `Monthly Energy Consumption for ${buildingName}`
-                }
-              }
-            }
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
           });
+
+          document.getElementById('energyInfo').innerHTML =
+            `<strong>Total Energy:</strong> ${total.toLocaleString()} kWh`;
         })
-        .catch(() => {
-          document.getElementById('error').innerText = "Error loading or reading Excel file.";
-        });
+        .catch(() => document.getElementById('error').innerText = "Error loading energy data.");
+    }
+
+    // 🟩 CARBON DATA
+    function loadCarbonData(name) {
+      fetch('carbon_emission.xlsx')
+        .then(res => res.arrayBuffer())
+        .then(data => {
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const headers = jsonData[1].slice(2, 11);
+          const rows = jsonData.slice(2);
+
+          const clean = s => (s || "").toString().trim().toLowerCase();
+          const row = rows.find(r => clean(r[1]) === clean(name));
+
+          if (!row) {
+            document.getElementById('error').innerText = "No carbon emission data found.";
+            return;
+          }
+
+          const monthly = row.slice(2, 11).map(Number);
+          const total = row[11] || 0;
+
+          new Chart(document.getElementById('carbonChart'), {
+            type: 'bar',
+            data: {
+              labels: headers,
+              datasets: [{
+                label: 'CO₂ (kg)',
+                data: monthly,
+                backgroundColor: 'rgba(5, 150, 105, 0.7)',
+                borderColor: '#065f46',
+                borderWidth: 1
+              }]
+            },
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
+          });
+
+          document.getElementById('carbonInfo').innerHTML =
+            `<strong>Total Carbon Emission:</strong> ${total.toLocaleString()} kg CO₂`;
+        })
+        .catch(() => document.getElementById('error').innerText = "Error loading carbon emission data.");
     }
   </script>
 </body>
