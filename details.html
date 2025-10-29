@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Building Details | IITM Energy Dashboard</title>
+  <title>IITM Energy Dashboard - Details</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -20,30 +20,32 @@
       height: 100vh;
       overflow-y: auto;
       color: #222;
+      position: relative;
       filter: brightness(1.15) contrast(1.1) saturate(1.15);
     }
 
     .detail-page {
-      background: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.95);
       border-radius: 16px;
       padding: 40px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
       min-width: 360px;
       max-width: 420px;
       margin: 100px auto;
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(6px);
       animation: fadeIn 0.6s ease;
     }
 
     h1 {
       color: #7b1113;
       font-weight: 700;
-      font-size: 26px;
-      margin-bottom: 25px;
+      font-size: 28px;
+      margin-bottom: 20px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
     }
 
     .detail-item {
-      margin: 18px 0;
+      margin: 20px 0;
       text-align: left;
       font-size: 17px;
     }
@@ -54,11 +56,11 @@
     }
 
     .back-btn {
-      margin-top: 30px;
+      margin-top: 25px;
       background-color: #7b1113;
       color: white;
       border: none;
-      padding: 10px 25px;
+      padding: 10px 20px;
       border-radius: 8px;
       cursor: pointer;
       font-size: 16px;
@@ -88,19 +90,15 @@
 <body>
   <div id="detailPage" class="detail-page">
     <h1 id="buildingTitle"></h1>
-
     <div class="detail-item">
       <span>Type:</span> <span id="buildingType"></span>
     </div>
-
     <div class="detail-item">
       <span>Energy Consumption:</span> <span id="energyValue"></span> kWh
     </div>
-
     <div class="detail-item">
       <span>Carbon Emission:</span> <span id="carbonValue"></span> tCO₂e
     </div>
-
     <button class="back-btn" onclick="goBack()">← Back</button>
   </div>
 
@@ -108,11 +106,11 @@
 
   <script>
     async function loadBuildingDetails() {
-      const building = localStorage.getItem("selectedBuilding");
-      const type = localStorage.getItem("selectedType");
+      const type = localStorage.getItem('selectedType');
+      const building = localStorage.getItem('selectedBuilding');
 
-      if (!building || !type) {
-        alert("No building data found. Redirecting...");
+      if (!type || !building) {
+        alert("No building selected. Redirecting...");
         window.location.href = "index.html";
         return;
       }
@@ -121,11 +119,11 @@
       document.getElementById("buildingType").textContent = type.toUpperCase();
 
       try {
-        const response = await fetch("energy.xlsx");
-        if (!response.ok) throw new Error("Excel file not found.");
+        const response = await fetch('energy.xlsx');
+        if (!response.ok) throw new Error('Excel file not found.');
 
         const data = await response.arrayBuffer();
-        const workbook = XLSX.read(data, { type: "array" });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = type === "academic" ? "Sheet1" : "Sheet2";
         const sheet = workbook.Sheets[sheetName];
         if (!sheet) throw new Error(`${sheetName} not found in Excel file.`);
@@ -164,3 +162,4 @@
   </script>
 </body>
 </html>
+
