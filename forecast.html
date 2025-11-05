@@ -1,79 +1,46 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Energy Forecast</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-</head>
+<script>
+  function goBack() {
+    window.location.href = 'details.html';
+  }
 
-<body class="bg-gray-100 font-sans">
-  <div class="bg-red-800 text-white text-3xl font-bold text-center py-4">
-    Forecast Energy Consumption
-  </div>
+  const API_URL = "https://energy-backend-ie4o.onrender.com/predict";
 
-  <div class="flex justify-center mt-12">
-    <div class="bg-white p-10 rounded-2xl shadow-lg w-full max-w-md">
-      <h2 class="text-xl font-semibold text-center mb-6 text-red-800">Enter Environmental Conditions</h2>
+  document.getElementById("forecastForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      <form id="forecastForm" class="flex flex-col space-y-4">
-        <label class="font-medium">Temperature (°C):
-          <input type="number" id="temperature" class="border rounded w-full p-2" required>
-        </label>
+    const temperature = parseFloat(document.getElementById("temperature").value);
+    const humidity = parseFloat(document.getElementById("humidity").value);
+    const buildingType = new URLSearchParams(window.location.search).get("type") || "educational";
 
-        <label class="font-medium">Humidity (%):
-          <input type="number" id="humidity" class="border rounded w-full p-2" required>
-        </label>
+    const payload = {
+      temperature,
+      humidity,
+      AC: 1,
+      Labs: 0,
+      AHU: 0,
+      Servers: 1,
+      building_type: buildingType
+    };
 
-        <button type="submit"
-          class="bg-red-800 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition">
-          Predict Energy
-        </button>
-      </form>
+    document.getElementById("result").innerText = "Predicting...";
 
-      <p id="result" class="text-center text-lg mt-6 font-semibold text-gray-700"></p>
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-      <div class="flex justify-center mt-8">
-        <button onclick="goBack()" class="bg-gray-400 hover:bg-gray-500 text-white font-semibold py-2 px-4 rounded">
-          ← Back
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    function goBack() {
-      window.location.href = 'details.html';
-    }
-
-    // Later connect this with your backend API endpoint:
-    const API_URL = "https://your-api-endpoint.onrender.com/predict";
-
-    document.getElementById("forecastForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const temp = parseFloat(document.getElementById("temperature").value);
-      const hum = parseFloat(document.getElementById("humidity").value);
-
-      document.getElementById("result").innerText = "Predicting...";
-
-      try {
-        const res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ temperature: temp, humidity: hum })
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          document.getElementById("result").innerText =
-            `Predicted Energy Consumption: ${data.predicted_energy.toFixed(2)} kWh`;
-        } else {
-          document.getElementById("result").innerText = "Error: " + data.error;
-        }
-      } catch (err) {
-        document.getElementById("result").innerText = "Network Error: " + err.message;
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById("result").innerText =
+          `Predicted Energy Consumption: ${data.predicted_energy} kWh`;
+      } else {
+        document.getElementById("result").innerText = "Error: " + data.error;
       }
-    });
-  </script>
-</body>
-</html>
+    } catch (err) {
+      document.getElementById("result").innerText = "Network Error: " + err.message;
+    }
+  });
+</script>
+
