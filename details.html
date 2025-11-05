@@ -10,7 +10,9 @@
 </head>
 
 <body class="bg-gray-100 font-sans">
-  <div class="bg-red-800 text-white text-3xl font-bold text-center py-4">Building Energy & Carbon Details</div>
+  <div class="bg-red-800 text-white text-3xl font-bold text-center py-4">
+    Building Energy & Carbon Details
+  </div>
 
   <div class="grid grid-cols-2 gap-10 mt-10 px-10">
     <!-- Carbon Emission Card -->
@@ -28,15 +30,29 @@
     </div>
   </div>
 
-  <div class="flex justify-center mt-10">
+  <!-- Buttons section -->
+  <div class="flex justify-center mt-10 space-x-4">
     <button onclick="goBack()" class="bg-red-800 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded">
       ← Back
+    </button>
+
+    <button onclick="goToForecast()" class="bg-green-700 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded">
+      Forecast →
     </button>
   </div>
 
   <script>
     function goBack() {
       window.location.href = 'index.html';
+    }
+
+    function goToForecast() {
+      // Keep building info in URL for forecast page
+      const urlParams = new URLSearchParams(window.location.search);
+      const building = urlParams.get('building');
+      const type = urlParams.get('type');
+      const url = `forecast.html?building=${encodeURIComponent(building)}&type=${encodeURIComponent(type)}`;
+      window.location.href = url;
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -163,3 +179,4 @@
   </script>
 </body>
 </html>
+
